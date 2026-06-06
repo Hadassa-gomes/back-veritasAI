@@ -93,7 +93,7 @@ async def verify_url(req: URLRequest):
             headers = {"User-Agent": "Mozilla/5.0 (compatible; Veritais/1.0)"}
             page = await http.get(req.url, headers=headers)
             
-            # Limpa o HTML extraindo apenas o texto visível real (evita tags de script/css no prompt)
+            # Limpa o HTML extraindo apenas o texto visível real
             soup = BeautifulSoup(page.text, "html.parser")
             page_text = soup.get_text(separator=" ", strip=True)[:4000]
     except Exception as e:
@@ -111,21 +111,29 @@ async def verify_url(req: URLRequest):
     try:
         client_secure = genai.Client(api_key=GEMINI_KEY)
         
-        # Ativação do Google Search + Forçamento de Resposta Estruturada via Pydantic
-        config_com_internet = types.GenerateContentConfig(
-            tools=[{"google_search": {}}],
+        # Etapa 1: Ativa o Google Search (Sem forçar Mime Type JSON) para fazer a checagem
+        config_busca = types.GenerateContentConfig(
+            tools=[{"google_search": {}}]
+        )
+        response_busca = client_secure.models.generate_content(
+            model=TARGET_MODEL,
+            contents=prompt,
+            config=config_busca
+        )
+        analise_bruta = response_busca.text
+
+        # Etapa 2: Pega o resultado estruturado na Etapa 1 e formata no Pydantic Schema esperado
+        config_json = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=FactCheckSchema
         )
-
-        response = client_secure.models.generate_content(
+        response_estruturada = client_secure.models.generate_content(
             model=TARGET_MODEL,
-            contents=prompt,
-            config=config_com_internet
+            contents=f"Formate a seguinte análise de fatos estritamente de acordo com o esquema solicitado:\n\n{analise_bruta}",
+            config=config_json
         )
         
-        # Aqui response.text já vem estritamente formatado em JSON limpo e sem markdown
-        verdict_data = json.loads(response.text)
+        verdict_data = json.loads(response_estruturada.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na API do Gemini: {str(e)}")
 
@@ -137,7 +145,7 @@ async def verify_url(req: URLRequest):
             verdict=verdict_data.get("verdict", "INCONCLUSIVO"),
             confidence=verdict_data.get("confidence", 0),
             summary=verdict_data.get("summary", ""),
-            analysis=verdict_data.get("analysis", ""),  # Salvando apenas o texto purificado da análise
+            analysis=verdict_data.get("analysis", ""),
             sources_found=json.dumps(factcheck_results),
         )
         db.add(verification)
@@ -153,7 +161,7 @@ async def verify_url(req: URLRequest):
         verdict=verification.verdict,
         confidence=verification.confidence,
         summary=verification.summary,
-        analysis=verification.analysis, # Retorno 100% livre de formatações de chaves JSON
+        analysis=verification.analysis,
         sources_found=factcheck_results,
         checked_at=created_at.isoformat()
     )
@@ -173,18 +181,29 @@ async def verify_text(req: TextRequest):
     try:
         client_secure = genai.Client(api_key=GEMINI_KEY)
         
-        config_com_internet = types.GenerateContentConfig(
-            tools=[{"google_search": {}}],
+        # Etapa 1: Ativa o Google Search (Sem forçar Mime Type JSON) para fazer a checagem
+        config_busca = types.GenerateContentConfig(
+            tools=[{"google_search": {}}]
+        )
+        response_busca = client_secure.models.generate_content(
+            model=TARGET_MODEL,
+            contents=prompt,
+            config=config_busca
+        )
+        analise_bruta = response_busca.text
+
+        # Etapa 2: Pega o resultado estruturado na Etapa 1 e formata no Pydantic Schema esperado
+        config_json = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=FactCheckSchema
         )
-
-        response = client_secure.models.generate_content(
+        response_estruturada = client_secure.models.generate_content(
             model=TARGET_MODEL,
-            contents=prompt,
-            config=config_com_internet
+            contents=f"Formate a seguinte análise de fatos estritamente de acordo com o esquema solicitado:\n\n{analise_bruta}",
+            config=config_json
         )
-        verdict_data = json.loads(response.text)
+        
+        verdict_data = json.loads(response_estruturada.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na API do Gemini: {str(e)}")
 
@@ -229,7 +248,7 @@ async def verify_image(file: UploadFile = File(...)):
 
     instructions = f"""{get_temporal_context()} Você é um especialista em verificação de fatos e análise de mídia visual.
                     
-Analise minuciosamente os elementos textuais e o contexto gráfico contidos nesta imagem para preencher a estrutura de dados solicitada.
+Analise minuciosamente os elements textuais e o contexto gráfico contidos nesta imagem para preencher a estrutura de dados solicitada.
 Verifique se há manipulações digitais óbvias, citações descontextualizadas ou elementos falsos."""
 
     try:
@@ -245,7 +264,7 @@ Verifique se há manipulações digitais óbvias, citações descontextualizadas
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=FactCheckSchema # Mantém consistência total com as outras rotas
+                response_schema=FactCheckSchema  # Mantém consistência total
             )
         )
         verdict_data = json.loads(response.text)
@@ -281,7 +300,7 @@ Verifique se há manipulações digitais óbvias, citações descontextualizadas
         checked_at=created_at.isoformat()
     )
 
-# Outras rotas permanecem inalteradas...
+
 @app.get("/history")
 def get_history(limit: int = 20, skip: int = 0):
     db = SessionLocal()

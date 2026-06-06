@@ -28,7 +28,7 @@ load_dotenv()
 
 # Configurações de chaves obtidas de forma segura
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
-TARGET_MODEL = "gemini-2.5-flash"
+TARGET_MODEL = "gemini-1.5-flash"
 
 if not GEMINI_KEY:
     raise RuntimeError("A variável de ambiente GEMINI_API_KEY não foi configurada no arquivo .env")

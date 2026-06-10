@@ -106,3 +106,132 @@ O backend usa um banco SQLite local chamado `veritais.db`. O arquivo é criado a
 - O backend libera CORS para todas as origens.
 - A rota de imagem aceita arquivos `jpeg`, `png`, `webp` e `gif`.
 - Se a chave `GEMINI_API_KEY` não estiver definida, a aplicação não sobe corretamente.
+
+
+
+
+
+
+
+## VeritasAI Backend
+The API responsible for content analysis and fact-checking within the VeritasAI application. This project processes text, URLs, and images, queries external sources when available, and utilizes Gemini to generate a structured verdict on the submitted content.
+
+In addition to the analysis, the backend saves each verification to a local SQLite database and exposes a query history.
+
+## What the API Does
+Analyzes text statements.
+
+Extracts and analyzes content from URLs.
+
+Performs multimodal analysis on images.
+
+Queries Google Fact Check Tools (when the API key is configured).
+
+Uses Google Search via Gemini to enrich fact-checking.
+
+Persists verification history in SQLite.
+
+## Technologies
+FastAPI
+
+Uvicorn
+
+Google GenAI SDK
+
+HTTPX
+
+SQLAlchemy
+
+SQLite
+
+BeautifulSoup4
+
+## Requirements
+Python 3.12 or higher.
+
+A virtual environment is highly recommended.
+
+GEMINI_API_KEY (Required).
+
+## Optional Keys:
+
+GOOGLE_FACTCHECK_API_KEY
+
+NEWS_API_KEY
+
+## Environment Variables
+Create a .env file in the root directory of the project containing at least:
+
+Snippet de código
+
+
+GEMINI_API_KEY=your_key_here
+Optionally, you can add:
+
+## Snippet de código
+
+
+GOOGLE_FACTCHECK_API_KEY=your_key_here
+NEWS_API_KEY=your_key_here
+Installation
+Activate your virtual environment and install the dependencies:
+
+## Bash
+
+
+pip install -r requirements.txt
+How to Run
+Start the API using Uvicorn:
+
+## Bash
+
+
+uvicorn main:app --reload
+By default, the application will run at: http://127.0.0.1:8000
+
+Main Endpoints
+GET /
+
+POST /verify/text
+
+POST /verify/url
+
+POST /verify/image
+
+GET /history
+
+GET /history/{verification_id}
+
+DELETE /history/{verification_id}
+
+## Database
+The backend uses a local SQLite database named veritais.db. This file is automatically created upon the first execution if it does not already exist.
+
+Analysis Workflow
+Input: Content is received by the API.
+
+External Search: The backend attempts to fetch external signals using Google Fact Check (if configured).
+
+AI Processing: Gemini receives the content and generates a structured analysis.
+
+Persistence: The result is saved to the database.
+
+Output: The final response is sent back to the frontend.
+
+## Core Structure
+main.py: API routes and Gemini integration.
+
+analyzer.py: Response schemas and prompt engineering.
+
+factcheck.py: Integrations with Google Fact Check and NewsAPI.
+
+models.py: Database models and SQLite configuration.
+
+veritais.db: Local database containing the history.
+
+## Notes
+⚠️ Important: If the GEMINI_API_KEY is not defined, the application will fail to start.
+
+The backend has CORS enabled for all origins.
+
+The image route accepts jpeg, png, webp, and gif file formats.
